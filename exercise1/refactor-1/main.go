@@ -40,6 +40,59 @@ var plays = map[string]interface{}{
 	},
 }
 
+func playFor(performance map[string]interface{}) map[string]interface{} {
+	playID, ok := performance["playID"].(string)
+	if !ok {
+		return nil
+	}
+
+	play, ok := plays[playID].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	return play
+}
+
+func amountFor(performance map[string]interface{}) int {
+	result := 0
+
+	playType, ok := playFor(performance)["type"].(string)
+	if !ok {
+		return 0
+	}
+
+	switch playType {
+	case "tragedy":
+		result = 40000
+		audience, ok := performance["audience"].(int)
+		if !ok {
+			return 0
+		}
+
+		if audience > 30 {
+			result += 1000 * (audience - 30)
+		}
+
+		break
+	case "comedy":
+		result = 30000
+		audience, ok := performance["audience"].(int)
+		if !ok {
+			return 0
+		}
+		if audience > 20 {
+			result += 10000 + 500*(audience-20)
+		}
+		result += 300 * audience
+		break
+	default:
+		return 0
+	}
+
+	return result
+}
+
 func statement(invoice, plays map[string]interface{}) string {
 	totalAmount := 0
 	volumeCredits := float64(0)
@@ -55,66 +108,29 @@ func statement(invoice, plays map[string]interface{}) string {
 		return ""
 	}
 
-	for _, perf := range performances {
-		playID, ok := perf["playID"].(string)
-		if !ok {
-			return ""
-		}
-
-		playValue, ok := plays[playID].(map[string]interface{})
-		if !ok {
-			return ""
-		}
-
-		thisAmount := 0
-
-		switch playValue["type"].(string) {
-		case "tragedy":
-			thisAmount = 40000
-			audience, ok := perf["audience"].(int)
-			if !ok {
-				return ""
-			}
-
-			if audience > 30 {
-				thisAmount += 1000 * (audience - 30)
-			}
-
-			break
-		case "comedy":
-			thisAmount = 30000
-			audience, ok := perf["audience"].(int)
-			if !ok {
-				return ""
-			}
-			if audience > 20 {
-				thisAmount += 10000 + 500*(audience-20)
-			}
-			thisAmount += 300 * audience
-			break
-		default:
-			return "unknown error"
-		}
-
+	for _, performance := range performances {
 		// add volume credits
-		audience, ok := perf["audience"].(int)
+		audience, ok := performance["audience"].(int)
 		if !ok {
 			return ""
 		}
 		volumeCredits += math.Max(float64(audience-30), 0)
 
-		playType, ok := playValue["type"].(string)
+		playType, ok := playFor(performance)["type"].(string)
 		if !ok {
 			return ""
 		}
-
 		if playType == "comedy" {
 			volumeCredits += math.Floor(float64(audience) / 5)
 		}
 
 		// print line for this order
-		result += "    " + playID + ": " + fmt.Sprintf("%d", thisAmount/100) + " " + fmt.Sprintf("%d", audience) + "seats" + "\n"
-		totalAmount += thisAmount
+		playID, ok := playFor(performance)["name"].(string)
+		if !ok {
+			return ""
+		}
+		result += "    " + playID + ": " + fmt.Sprintf("%d", amountFor(performance)/100) + " " + fmt.Sprintf("%d", audience) + "seats" + "\n"
+		totalAmount += amountFor(performance)
 	}
 
 	result += "Amount owed is " + fmt.Sprintf("%d", totalAmount/100) + "\n"
