@@ -93,10 +93,53 @@ func amountFor(performance map[string]interface{}) int {
 	return result
 }
 
-func statement(invoice, plays map[string]interface{}) string {
-	totalAmount := 0
-	volumeCredits := float64(0)
+func volumeCreditsFor(performance map[string]interface{}) float64 {
+	result := 0.0
 
+	audience, ok := performance["audience"].(int)
+	if !ok {
+		fmt.Println("no audience in performance")
+		return 0
+	}
+
+	result += math.Max(float64(audience-30), 0)
+
+	playType, ok := playFor(performance)["type"].(string)
+	if !ok {
+		fmt.Println("no play type in performance")
+		return 0
+	}
+
+	if playType == "comedy" {
+		result += math.Floor(float64(audience) / 5)
+	}
+
+	return result
+}
+
+func usd(amount int) string {
+	return fmt.Sprintf("%d", amount)
+}
+
+func totalVolumeCredits(performances []map[string]interface{}) float64 {
+	result := 0.0
+	for _, performance := range performances {
+		result += volumeCreditsFor(performance)
+	}
+
+	return result
+}
+
+func totalAmount(performances []map[string]interface{}) int {
+	result := 0
+	for _, performance := range performances {
+		result += amountFor(performance)
+	}
+
+	return result
+}
+
+func statement(invoice, plays map[string]interface{}) string {
 	customer, ok := invoice["customer"].(string)
 	if !ok {
 		return ""
@@ -109,32 +152,22 @@ func statement(invoice, plays map[string]interface{}) string {
 	}
 
 	for _, performance := range performances {
-		// add volume credits
-		audience, ok := performance["audience"].(int)
-		if !ok {
-			return ""
-		}
-		volumeCredits += math.Max(float64(audience-30), 0)
-
-		playType, ok := playFor(performance)["type"].(string)
-		if !ok {
-			return ""
-		}
-		if playType == "comedy" {
-			volumeCredits += math.Floor(float64(audience) / 5)
-		}
-
 		// print line for this order
 		playID, ok := playFor(performance)["name"].(string)
 		if !ok {
 			return ""
 		}
-		result += "    " + playID + ": " + fmt.Sprintf("%d", amountFor(performance)/100) + " " + fmt.Sprintf("%d", audience) + "seats" + "\n"
-		totalAmount += amountFor(performance)
+
+		audience, ok := performance["audience"].(int)
+		if !ok {
+			return ""
+		}
+
+		result += "    " + playID + ": " + usd(amountFor(performance)/100) + " " + fmt.Sprintf("%d", audience) + "seats" + "\n"
 	}
 
-	result += "Amount owed is " + fmt.Sprintf("%d", totalAmount/100) + "\n"
-	result += "You earned " + fmt.Sprintf("%f", volumeCredits) + "credits"
+	result += fmt.Sprintf("Amount owed is %s\n", usd(totalAmount(performances)/100))
+	result += fmt.Sprintf("You earned %f credits", totalVolumeCredits(performances))
 	return result
 }
 
